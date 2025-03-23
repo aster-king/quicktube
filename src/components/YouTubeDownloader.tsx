@@ -1,8 +1,10 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Download, Loader, Check } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
 import { toast } from "sonner";
+import { downloadYouTubeVideo } from "@/services/youtubeService";
+import { Progress } from "@/components/ui/progress";
 
 type VideoQuality = "360p" | "720p" | "1080p" | "4K";
 
@@ -23,6 +25,8 @@ export function YouTubeDownloader() {
     includeThumbnail: true,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -72,28 +76,46 @@ export function YouTubeDownloader() {
     }
     
     setIsLoading(true);
+    setIsDownloading(true);
+    setDownloadProgress(10);
     
     try {
-      // Simulate download process
-      await delay(2000);
-      
-      // Simulate successful download
-      toast.success("Download started successfully", {
-        description: `Downloading video in ${options.quality} quality`,
+      toast.info("Preparing download...", {
+        description: `Preparing video in ${options.quality} quality`,
       });
       
-      // In a real app, you would call your backend API here
-      console.log("Download options:", {
+      // Brief delay to show preparing toast
+      await delay(500);
+      setDownloadProgress(30);
+      
+      // Call the actual download service
+      const result = await downloadYouTubeVideo({
         videoId,
-        ...options,
+        quality: options.quality,
+        includeSubtitles: options.includeSubtitles,
+        includeThumbnail: options.includeThumbnail
       });
+      
+      setDownloadProgress(100);
+      
+      if (result.success) {
+        toast.success("Download started successfully", {
+          description: `Your download should begin automatically. If not, check your browser's popup settings.`,
+        });
+      } else {
+        throw new Error(result.error || "Download failed");
+      }
       
     } catch (error) {
       toast.error("Failed to download video", {
-        description: "Please try again later",
+        description: error instanceof Error ? error.message : "Please try again later",
       });
     } finally {
+      // Brief delay before resetting UI
+      await delay(1000);
       setIsLoading(false);
+      setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
   
@@ -179,6 +201,16 @@ export function YouTubeDownloader() {
                 (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${videoId}/0.jpg`;
               }}
             />
+          </div>
+        )}
+        
+        {isDownloading && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Downloading...</span>
+              <span>{downloadProgress}%</span>
+            </div>
+            <Progress value={downloadProgress} className="h-2" />
           </div>
         )}
         
