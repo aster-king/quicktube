@@ -99,8 +99,8 @@ export function YouTubeDownloader() {
       setDownloadProgress(100);
       
       if (result.success) {
-        toast.success("Download started successfully", {
-          description: `Your download should begin automatically. If not, check your browser's popup settings.`,
+        toast.success("Download started", {
+          description: "Your download should begin shortly",
         });
       } else {
         throw new Error(result.error || "Download failed");

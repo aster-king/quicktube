@@ -18,18 +18,29 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
   try {
     console.log("Preparing download with options:", options);
     
-    // In a real implementation, this would make a fetch request to your backend API
-    // For demonstration, we'll use a proxy service that handles YouTube downloads
-    
-    // Create download URL based on options
-    const baseUrl = "https://loader.to/api/button/";
+    // Create a direct download URL for the video
+    // This approach uses a different service that allows direct downloads
     const format = getFormatFromQuality(options.quality);
-    const downloadUrl = `${baseUrl}?url=https://www.youtube.com/watch?v=${options.videoId}&f=${format}`;
+    
+    // Using the y2mate service which provides direct download links
+    const videoUrl = `https://www.youtube.com/watch?v=${options.videoId}`;
+    const downloadUrl = `https://api.vevioz.com/api/button/mp4/${options.videoId}`;
     
     console.log("Generated download URL:", downloadUrl);
     
-    // Trigger the download by opening the URL in a new tab
-    window.open(downloadUrl, "_blank");
+    // Create an invisible anchor element to trigger the download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', `youtube_video_${options.videoId}.mp4`);
+    link.setAttribute('target', '_blank');
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    
+    // Trigger the download
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
     
     return {
       success: true,
@@ -44,19 +55,19 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
   }
 };
 
-// Helper function to map our quality options to the format codes used by the service
+// Helper function to map our quality options to the format codes
 const getFormatFromQuality = (quality: string): string => {
   switch (quality) {
     case "360p":
-      return "360mp4";
+      return "360";
     case "720p":
-      return "720mp4";
+      return "720";
     case "1080p":
-      return "1080mp4";
+      return "1080";
     case "4K":
-      return "4kmp4";
+      return "4k";
     default:
-      return "720mp4"; // Default to 720p
+      return "720";
   }
 };
 
