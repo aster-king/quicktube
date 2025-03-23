@@ -1,10 +1,11 @@
 
 import { useState } from "react";
-import { Download, Loader, Check } from "lucide-react";
+import { Download, Loader, Check, Server } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
 import { toast } from "sonner";
-import { downloadYouTubeVideo } from "@/services/youtubeService";
+import { downloadYouTubeVideo, checkDownloadProgress } from "@/services/youtubeService";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type VideoQuality = "360p" | "720p" | "1080p" | "4K";
 
@@ -81,7 +82,7 @@ export function YouTubeDownloader() {
     
     try {
       toast.info("Preparing download...", {
-        description: `Preparing video in ${options.quality} quality`,
+        description: `Preparing video in ${options.quality} quality using yt-dlp`,
       });
       
       // Brief delay to show preparing toast
@@ -96,11 +97,10 @@ export function YouTubeDownloader() {
         includeThumbnail: options.includeThumbnail
       });
       
-      setDownloadProgress(100);
-      
       if (result.success) {
+        setDownloadProgress(100);
         toast.success("Download started", {
-          description: "Your download should begin shortly",
+          description: result.message || "Your download should begin shortly",
         });
       } else {
         throw new Error(result.error || "Download failed");
@@ -162,9 +162,18 @@ export function YouTubeDownloader() {
           QuickTube Downloader
         </h1>
         <p className="mt-2 text-muted-foreground animate-fade-in delay-75">
-          Download YouTube videos with just a few clicks
+          Download YouTube videos with yt-dlp & ffmpeg
         </p>
       </div>
+      
+      <Alert className="mb-6">
+        <Server className="h-4 w-4" />
+        <AlertTitle>Backend Required</AlertTitle>
+        <AlertDescription>
+          This app requires a backend server with yt-dlp and ffmpeg installed.
+          Please ensure your backend API is properly configured.
+        </AlertDescription>
+      </Alert>
       
       <form onSubmit={handleSubmit} className="space-y-6 animate-slide-in">
         <div className="space-y-2">
