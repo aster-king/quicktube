@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Download, Loader, Check } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 type VideoQuality = "360p" | "720p" | "1080p" | "4K";
 
