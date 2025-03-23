@@ -4,9 +4,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { download } from "https://deno.land/x/download@v2.0.2/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.207.0/fs/ensure_dir.ts";
-import { extract } from "https://deno.land/std@0.207.0/archive/extract.ts";
-import { exists } from "https://deno.land/std@0.207.0/fs/exists.ts";
+import { ensureDir } from "https://deno.land/std@0.190.0/fs/ensure_dir.ts";
+import { exists } from "https://deno.land/std@0.190.0/fs/exists.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,8 +58,21 @@ async function setupBinaries() {
     
     await download(ffmpegUrl, { file: "ffmpeg.tar.gz", dir: TEMP_DIR });
     
-    // Extract archive
-    await extract(ffmpegArchive, TOOLS_DIR);
+    // Extract archive using manual extraction since we removed the extract import
+    console.log("Extracting FFmpeg archive...");
+    
+    // Create a process to extract the archive using tar
+    const extractProcess = new Deno.Command("tar", {
+      args: ["-xzf", ffmpegArchive, "-C", TOOLS_DIR],
+    });
+    
+    const { code, stdout, stderr } = await extractProcess.output();
+    
+    if (code !== 0) {
+      const errorOutput = new TextDecoder().decode(stderr);
+      console.error("Error extracting archive:", errorOutput);
+      throw new Error(`Failed to extract FFmpeg archive: ${errorOutput}`);
+    }
     
     // Set permissions
     await Deno.chmod(`${TOOLS_DIR}/ffmpeg`, 0o755);
