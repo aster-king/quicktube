@@ -9,33 +9,98 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configure YouTube-dl path - this will be pointing to the executable
-// This assumes the binary is available in the server environment
-const YOUTUBE_DL_PATH = Deno.env.get("YOUTUBE_DL_PATH") || "/usr/local/bin/yt-dlp";
+// Server config - update this with your server's information
+const DOWNLOAD_SERVER_URL = Deno.env.get("DOWNLOAD_SERVER_URL") || "https://ytdlp-server.example.com";
+const SERVER_API_KEY = Deno.env.get("DOWNLOAD_SERVER_API_KEY") || "default_api_key"; 
 
-const downloadVideo = async (videoId: string, quality: string): Promise<{ 
-  filePath: string;
-  fileSize: number;
+interface DownloadOptions {
+  videoId: string;
+  quality: string;
+  includeSubtitles: boolean;
+  includeThumbnail: boolean;
+}
+
+// Function to download video by communicating with an external server
+const downloadVideo = async (options: DownloadOptions): Promise<{ 
   downloadUrl: string;
   filename: string;
+  fileSize: number;
+  fileType: string;
+  additionalFiles?: Array<{
+    type: string;
+    name: string;
+    content: string;
+  }>;
 }> => {
   try {
-    console.log(`Starting download for video ${videoId} with quality ${quality}`);
+    console.log(`Requesting download for video ${options.videoId} with quality ${options.quality}`);
     
-    // Since we can't directly download within the Edge Function environment,
-    // we'll use mock data for demonstration
-    // In a real server setup, you would run a command like:
-    // await Deno.run({
-    //   cmd: [YOUTUBE_DL_PATH, `https://www.youtube.com/watch?v=${videoId}`, 
-    //         "-f", quality, "-o", outputPath],
-    // });
+    // For development testing without the server running, toggle this flag
+    const USE_MOCK_DATA = true;
     
-    // Mock successful download
+    if (USE_MOCK_DATA) {
+      // Return mock data for testing
+      console.log("Using mock download data");
+      
+      const mockResponse = {
+        downloadUrl: `https://img.youtube.com/vi/${options.videoId}/maxresdefault.jpg`, // Using thumbnail as mock
+        filename: `youtube-${options.videoId}.mp4`,
+        fileSize: 1024 * 1024 * 25, // Mock 25MB file size
+        fileType: "video/mp4",
+        additionalFiles: []
+      };
+      
+      // Add mock additional files based on options
+      if (options.includeThumbnail) {
+        mockResponse.additionalFiles.push({
+          type: "thumbnail",
+          name: `thumbnail-${options.videoId}.jpg`,
+          content: `https://img.youtube.com/vi/${options.videoId}/hqdefault.jpg`
+        });
+      }
+      
+      if (options.includeSubtitles) {
+        mockResponse.additionalFiles.push({
+          type: "subtitles",
+          name: `subtitles-${options.videoId}.vtt`,
+          content: `https://mock-subtitles-url/${options.videoId}.vtt`
+        });
+      }
+      
+      return mockResponse;
+    }
+    
+    // Make a request to the external download server
+    // This server would be running the ytdlp-ffmpeg tools from the GitHub repo
+    const response = await fetch(`${DOWNLOAD_SERVER_URL}/api/download`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SERVER_API_KEY}`
+      },
+      body: JSON.stringify({
+        videoId: options.videoId,
+        quality: options.quality,
+        includeSubtitles: options.includeSubtitles,
+        includeThumbnail: options.includeThumbnail
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Server error response:", errorData);
+      throw new Error(`Download server error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("Download server response:", data);
+    
     return {
-      filePath: `/tmp/videos/youtube-${videoId}.mp4`,
-      fileSize: 1024 * 1024 * 25, // Mock 25MB file size
-      downloadUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, // Using thumbnail as mock
-      filename: `youtube-${videoId}.mp4`
+      downloadUrl: data.downloadUrl,
+      filename: data.filename,
+      fileSize: data.fileSize,
+      fileType: data.fileType,
+      additionalFiles: data.additionalFiles
     };
   } catch (error) {
     console.error("Download error:", error);
@@ -51,7 +116,8 @@ serve(async (req) => {
   
   try {
     if (req.method === "POST") {
-      const { videoId, quality, includeSubtitles, includeThumbnail } = await req.json();
+      const requestData = await req.json();
+      const { videoId, quality, includeSubtitles, includeThumbnail } = requestData;
       
       if (!videoId) {
         return new Response(
@@ -66,40 +132,24 @@ serve(async (req) => {
       console.log("Received download request:", { videoId, quality, includeSubtitles, includeThumbnail });
       
       try {
-        // Download the video (mock in edge function environment)
-        const downloadResult = await downloadVideo(videoId, quality);
-        
-        // Create response object
-        const response = {
-          success: true,
-          downloadUrl: downloadResult.downloadUrl, // In a real setup, this would be a signed URL
-          filename: downloadResult.filename,
-          fileSize: downloadResult.fileSize,
-          fileType: "video/mp4",
-          additionalFiles: []
-        };
-        
-        // Add thumbnail if requested
-        if (includeThumbnail) {
-          response.additionalFiles.push({
-            type: "thumbnail",
-            name: `thumbnail-${videoId}.jpg`,
-            content: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-          });
-        }
-        
-        // Add subtitles if requested
-        if (includeSubtitles) {
-          response.additionalFiles.push({
-            type: "subtitles",
-            name: `subtitles-${videoId}.vtt`,
-            content: `https://mock-subtitles-url/${videoId}.vtt` // Mock subtitles URL
-          });
-        }
+        // Call the download function that communicates with the external server
+        const downloadResult = await downloadVideo({
+          videoId,
+          quality,
+          includeSubtitles,
+          includeThumbnail
+        });
         
         // Return successful response
         return new Response(
-          JSON.stringify(response),
+          JSON.stringify({
+            success: true,
+            downloadUrl: downloadResult.downloadUrl,
+            filename: downloadResult.filename,
+            fileSize: downloadResult.fileSize,
+            fileType: downloadResult.fileType,
+            additionalFiles: downloadResult.additionalFiles || []
+          }),
           { 
             headers: { ...corsHeaders, "Content-Type": "application/json" } 
           }

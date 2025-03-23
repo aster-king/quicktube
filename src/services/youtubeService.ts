@@ -32,7 +32,7 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
     const { data, error } = await supabase.functions.invoke('download-youtube', {
       body: {
         videoId: options.videoId,
-        quality: getFormatFromQuality(options.quality),
+        quality: options.quality,
         includeSubtitles: options.includeSubtitles,
         includeThumbnail: options.includeThumbnail,
       },
