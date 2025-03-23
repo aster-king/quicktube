@@ -43,23 +43,10 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
     
     console.log("Download response:", data);
     
-    // Create an invisible anchor element to trigger the download
-    const link = document.createElement('a');
-    link.href = data.downloadUrl;
-    link.setAttribute('download', data.filename || `youtube_video_${options.videoId}.mp4`);
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    
-    // Trigger the download
-    link.click();
-    
-    // Clean up
-    document.body.removeChild(link);
-    
     return {
       success: true,
       url: data.downloadUrl,
-      message: "Download started successfully",
+      message: "Video fetched successfully",
       filename: data.filename,
       fileSize: data.fileSize,
       fileType: data.fileType

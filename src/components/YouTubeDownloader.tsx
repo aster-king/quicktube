@@ -1,11 +1,10 @@
 
 import { useState } from "react";
-import { Download, Loader, Check, Server } from "lucide-react";
+import { Download, Loader, Check, ArrowDown } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
 import { toast } from "sonner";
 import { downloadYouTubeVideo } from "@/services/youtubeService";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 type VideoQuality = "360p" | "720p" | "1080p" | "4K";
@@ -29,6 +28,10 @@ export function YouTubeDownloader() {
   const [isLoading, setIsLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadFilename, setDownloadFilename] = useState<string | null>(null);
+  const [downloadFileSize, setDownloadFileSize] = useState<number | null>(null);
+  const [downloadStage, setDownloadStage] = useState<"idle" | "fetching" | "processing" | "ready">("idle");
   
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -46,6 +49,11 @@ export function YouTubeDownloader() {
       setVideoId(null);
       setThumbnailUrl("");
     }
+    
+    // Reset download state when URL changes
+    setDownloadUrl(null);
+    setDownloadStage("idle");
+    setDownloadProgress(0);
   };
   
   const handleQualityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -69,7 +77,7 @@ export function YouTubeDownloader() {
     });
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFetchVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isUrlValid || !videoId) {
@@ -79,16 +87,26 @@ export function YouTubeDownloader() {
     
     setIsLoading(true);
     setIsDownloading(true);
+    setDownloadStage("fetching");
     setDownloadProgress(10);
     
     try {
-      toast.info("Preparing download...", {
-        description: `Preparing video in ${options.quality} quality using yt-dlp`,
+      // First stage - fetching
+      toast.info("Fetching video...", {
+        description: `Getting video in ${options.quality} quality`,
       });
       
-      // Brief delay to show preparing toast
       await delay(500);
       setDownloadProgress(30);
+      setDownloadStage("processing");
+      
+      // Second stage - processing
+      toast.info("Processing video...", {
+        description: "Converting format and preparing download",
+      });
+      
+      await delay(500);
+      setDownloadProgress(60);
       
       // Call the actual download service
       const result = await downloadYouTubeVideo({
@@ -100,24 +118,55 @@ export function YouTubeDownloader() {
       
       if (result.success) {
         setDownloadProgress(100);
-        toast.success("Download successful", {
-          description: `File: ${result.filename || "video.mp4"} (${result.fileSize ? formatFileSize(result.fileSize) : "Unknown size"})`,
+        setDownloadStage("ready");
+        setDownloadUrl(result.url || null);
+        setDownloadFilename(result.filename || null);
+        setDownloadFileSize(result.fileSize || null);
+        
+        toast.success("Video ready to download", {
+          description: `File: ${result.filename || "video.mp4"}`,
         });
       } else {
-        throw new Error(result.error || "Download failed");
+        throw new Error(result.error || "Failed to fetch video");
       }
       
     } catch (error) {
-      toast.error("Failed to download video", {
+      toast.error("Failed to fetch video", {
         description: error instanceof Error ? error.message : "Please try again later",
       });
-    } finally {
-      // Brief delay before resetting UI
-      await delay(1000);
-      setIsLoading(false);
-      setIsDownloading(false);
+      setDownloadStage("idle");
       setDownloadProgress(0);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (!downloadUrl) return;
+    
+    // Create an invisible anchor element to trigger the download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', downloadFilename || `youtube_video.mp4`);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    
+    // Trigger the download
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+    
+    toast.success("Download started", {
+      description: "Your video download has started",
+    });
+  };
+  
+  const resetDownload = () => {
+    setDownloadUrl(null);
+    setDownloadStage("idle");
+    setDownloadProgress(0);
+    setIsDownloading(false);
   };
   
   // Checkbox component for better reusability
@@ -156,6 +205,39 @@ export function YouTubeDownloader() {
     </label>
   );
 
+  // Progress indicator component
+  const StageProgressIndicator = () => {
+    let statusText = "";
+    let statusColor = "";
+    
+    switch (downloadStage) {
+      case "fetching":
+        statusText = "Fetching video...";
+        statusColor = "text-blue-500";
+        break;
+      case "processing":
+        statusText = "Processing video...";
+        statusColor = "text-amber-500";
+        break;
+      case "ready":
+        statusText = "Ready to download";
+        statusColor = "text-green-500";
+        break;
+      default:
+        return null;
+    }
+    
+    return (
+      <div className="space-y-3 animate-fade-in">
+        <div className="flex justify-between items-center text-sm">
+          <span className={cn("font-medium", statusColor)}>{statusText}</span>
+          <span>{downloadProgress}%</span>
+        </div>
+        <Progress value={downloadProgress} className="h-2" />
+      </div>
+    );
+  };
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="mb-8 text-center">
@@ -163,19 +245,11 @@ export function YouTubeDownloader() {
           QuickTube Downloader
         </h1>
         <p className="mt-2 text-muted-foreground animate-fade-in delay-75">
-          Download YouTube videos with yt-dlp & ffmpeg
+          Download YouTube videos in your favorite format
         </p>
       </div>
       
-      <Alert className="mb-6">
-        <Server className="h-4 w-4" />
-        <AlertTitle>Supabase Integration</AlertTitle>
-        <AlertDescription>
-          This app uses a Supabase Edge Function with yt-dlp and ffmpeg to download videos.
-        </AlertDescription>
-      </Alert>
-      
-      <form onSubmit={handleSubmit} className="space-y-6 animate-slide-in">
+      <form onSubmit={handleFetchVideo} className="space-y-6 animate-slide-in">
         <div className="space-y-2">
           <label htmlFor="youtube-url" className="text-sm font-medium">
             YouTube URL
@@ -213,15 +287,7 @@ export function YouTubeDownloader() {
           </div>
         )}
         
-        {isDownloading && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Downloading...</span>
-              <span>{downloadProgress}%</span>
-            </div>
-            <Progress value={downloadProgress} className="h-2" />
-          </div>
-        )}
+        {downloadStage !== "idle" && <StageProgressIndicator />}
         
         <div className="space-y-2">
           <label htmlFor="quality" className="text-sm font-medium">
@@ -236,6 +302,7 @@ export function YouTubeDownloader() {
               "focus:outline-none focus:ring-2 focus:ring-primary/50",
               "transition-all duration-200"
             )}
+            disabled={downloadStage !== "idle"}
           >
             <option value="360p">360p</option>
             <option value="720p">720p</option>
@@ -260,30 +327,44 @@ export function YouTubeDownloader() {
           />
         </div>
         
-        <button
-          type="submit"
-          disabled={!isUrlValid || isLoading}
-          className={cn(
-            "w-full py-2.5 px-4 rounded-md font-medium flex items-center justify-center",
-            "transition-all duration-200 transform active:scale-[0.98]",
-            "focus:outline-none focus:ring-2 focus:ring-primary/50",
-            isUrlValid && !isLoading
-              ? "bg-primary text-primary-foreground hover:bg-primary/90"
-              : "bg-muted text-muted-foreground cursor-not-allowed"
-          )}
-        >
-          {isLoading ? (
-            <>
-              <Loader className="mr-2 h-4 w-4 animate-spin-slow" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Download className="mr-2 h-4 w-4" />
+        {downloadStage === "ready" ? (
+          <div className="flex space-x-2">
+            <Button
+              type="button"
+              variant="default"
+              className="flex-1"
+              onClick={handleDownload}
+            >
+              <ArrowDown className="mr-2 h-4 w-4" />
               Download Video
-            </>
-          )}
-        </button>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetDownload}
+            >
+              Try Another
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="submit"
+            disabled={!isUrlValid || isLoading || downloadStage !== "idle"}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin-slow" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Fetch Video
+              </>
+            )}
+          </Button>
+        )}
       </form>
     </div>
   );
