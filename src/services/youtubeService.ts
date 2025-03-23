@@ -34,10 +34,12 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
     });
     
     if (error) {
+      console.error("Supabase function error:", error);
       throw new Error(error.message || "Failed to download video");
     }
     
     if (!data || !data.downloadUrl) {
+      console.error("No download URL in response:", data);
       throw new Error("No download URL provided by the server");
     }
     
