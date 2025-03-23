@@ -9,6 +9,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Configure YouTube-dl path - this will be pointing to the executable
+// This assumes the binary is available in the server environment
+const YOUTUBE_DL_PATH = Deno.env.get("YOUTUBE_DL_PATH") || "/usr/local/bin/yt-dlp";
+
+const downloadVideo = async (videoId: string, quality: string): Promise<{ 
+  filePath: string;
+  fileSize: number;
+  downloadUrl: string;
+  filename: string;
+}> => {
+  try {
+    console.log(`Starting download for video ${videoId} with quality ${quality}`);
+    
+    // Since we can't directly download within the Edge Function environment,
+    // we'll use mock data for demonstration
+    // In a real server setup, you would run a command like:
+    // await Deno.run({
+    //   cmd: [YOUTUBE_DL_PATH, `https://www.youtube.com/watch?v=${videoId}`, 
+    //         "-f", quality, "-o", outputPath],
+    // });
+    
+    // Mock successful download
+    return {
+      filePath: `/tmp/videos/youtube-${videoId}.mp4`,
+      fileSize: 1024 * 1024 * 25, // Mock 25MB file size
+      downloadUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, // Using thumbnail as mock
+      filename: `youtube-${videoId}.mp4`
+    };
+  } catch (error) {
+    console.error("Download error:", error);
+    throw new Error(`Failed to download video: ${error.message}`);
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -31,37 +65,58 @@ serve(async (req) => {
       
       console.log("Received download request:", { videoId, quality, includeSubtitles, includeThumbnail });
       
-      // Instead of downloading videos directly, we'll simulate the download stages
-      // and return a stub response for the frontend to display
-      
-      // In a production environment, you would need to use a service like YouTube's Data API
-      // or a cloud function with file system access permissions to handle actual downloads
-      
-      // Simulate a video response
-      const mockResponse = {
-        success: true,
-        downloadUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, // Just return the thumbnail URL as a placeholder
-        filename: `youtube-${videoId}.mp4`,
-        fileSize: 1024 * 1024 * 10, // 10MB mock file size
-        fileType: "mp4",
-        additionalFiles: []
-      };
-      
-      if (includeThumbnail) {
-        mockResponse.additionalFiles.push({
-          type: "thumbnail",
-          name: `thumbnail-${videoId}.jpg`,
-          content: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-        });
-      }
-      
-      // Return successful mock response
-      return new Response(
-        JSON.stringify(mockResponse),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      try {
+        // Download the video (mock in edge function environment)
+        const downloadResult = await downloadVideo(videoId, quality);
+        
+        // Create response object
+        const response = {
+          success: true,
+          downloadUrl: downloadResult.downloadUrl, // In a real setup, this would be a signed URL
+          filename: downloadResult.filename,
+          fileSize: downloadResult.fileSize,
+          fileType: "video/mp4",
+          additionalFiles: []
+        };
+        
+        // Add thumbnail if requested
+        if (includeThumbnail) {
+          response.additionalFiles.push({
+            type: "thumbnail",
+            name: `thumbnail-${videoId}.jpg`,
+            content: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+          });
         }
-      );
+        
+        // Add subtitles if requested
+        if (includeSubtitles) {
+          response.additionalFiles.push({
+            type: "subtitles",
+            name: `subtitles-${videoId}.vtt`,
+            content: `https://mock-subtitles-url/${videoId}.vtt` // Mock subtitles URL
+          });
+        }
+        
+        // Return successful response
+        return new Response(
+          JSON.stringify(response),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      } catch (downloadError) {
+        console.error("Error downloading video:", downloadError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to download video", 
+            details: downloadError.message 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
     } else {
       return new Response(
         JSON.stringify({ error: "Method not allowed" }),

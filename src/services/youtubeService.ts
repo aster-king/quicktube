@@ -17,6 +17,11 @@ interface DownloadResponse {
   filename?: string;
   fileSize?: number;
   fileType?: string;
+  additionalFiles?: Array<{
+    type: string;
+    name: string;
+    content: string;
+  }>;
 }
 
 export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<DownloadResponse> => {
@@ -27,7 +32,7 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
     const { data, error } = await supabase.functions.invoke('download-youtube', {
       body: {
         videoId: options.videoId,
-        quality: options.quality,
+        quality: getFormatFromQuality(options.quality),
         includeSubtitles: options.includeSubtitles,
         includeThumbnail: options.includeThumbnail,
       },
@@ -51,7 +56,8 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
       message: "Video fetched successfully",
       filename: data.filename,
       fileSize: data.fileSize,
-      fileType: data.fileType
+      fileType: data.fileType,
+      additionalFiles: data.additionalFiles
     };
   } catch (error) {
     console.error("Error downloading video:", error);
@@ -66,15 +72,15 @@ export const downloadYouTubeVideo = async (options: DownloadOptions): Promise<Do
 export const getFormatFromQuality = (quality: string): string => {
   switch (quality) {
     case "360p":
-      return "360";
+      return "18"; // YouTube format code for 360p MP4
     case "720p":
-      return "720";
+      return "22"; // YouTube format code for 720p MP4
     case "1080p":
-      return "1080";
+      return "137+140"; // YouTube format code for 1080p video + audio
     case "4K":
-      return "4k";
+      return "313+140"; // YouTube format code for 4K video + audio
     default:
-      return "720";
+      return "22"; // Default to 720p
   }
 };
 
