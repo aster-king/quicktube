@@ -3,9 +3,10 @@ import { useState } from "react";
 import { Download, Loader, Check, Server } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
 import { toast } from "sonner";
-import { downloadYouTubeVideo, checkDownloadProgress } from "@/services/youtubeService";
+import { downloadYouTubeVideo } from "@/services/youtubeService";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 type VideoQuality = "360p" | "720p" | "1080p" | "4K";
 
@@ -99,8 +100,8 @@ export function YouTubeDownloader() {
       
       if (result.success) {
         setDownloadProgress(100);
-        toast.success("Download started", {
-          description: result.message || "Your download should begin shortly",
+        toast.success("Download successful", {
+          description: `File: ${result.filename || "video.mp4"} (${result.fileSize ? formatFileSize(result.fileSize) : "Unknown size"})`,
         });
       } else {
         throw new Error(result.error || "Download failed");
@@ -168,10 +169,9 @@ export function YouTubeDownloader() {
       
       <Alert className="mb-6">
         <Server className="h-4 w-4" />
-        <AlertTitle>Backend Required</AlertTitle>
+        <AlertTitle>Supabase Integration</AlertTitle>
         <AlertDescription>
-          This app requires a backend server with yt-dlp and ffmpeg installed.
-          Please ensure your backend API is properly configured.
+          This app uses a Supabase Edge Function with yt-dlp and ffmpeg to download videos.
         </AlertDescription>
       </Alert>
       
@@ -287,4 +287,14 @@ export function YouTubeDownloader() {
       </form>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (!bytes || bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
