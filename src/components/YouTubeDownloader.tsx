@@ -1,16 +1,21 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, Loader, Check, ArrowDown } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
 import { toast } from "sonner";
-import { downloadYouTubeVideo } from "@/services/youtubeService";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
-type VideoQuality = "360p" | "720p" | "1080p" | "4K";
+type VideoQuality = string;
+
+interface VideoFormat {
+  quality: string;
+  label: string;
+  format_id: string;
+}
 
 interface DownloadOptions {
-  quality: VideoQuality;
+  quality: string;
   includeSubtitles: boolean;
   includeThumbnail: boolean;
 }
@@ -32,6 +37,13 @@ export function YouTubeDownloader() {
   const [downloadFilename, setDownloadFilename] = useState<string | null>(null);
   const [downloadFileSize, setDownloadFileSize] = useState<number | null>(null);
   const [downloadStage, setDownloadStage] = useState<"idle" | "fetching" | "processing" | "ready">("idle");
+  const [availableQualities, setAvailableQualities] = useState<VideoFormat[]>([
+    { quality: "360p", label: "360p", format_id: "18" },
+    { quality: "720p", label: "720p (HD)", format_id: "22" },
+    { quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" },
+    { quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" }
+  ]);
+  const [videoTitle, setVideoTitle] = useState<string | null>(null);
   
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -44,10 +56,18 @@ export function YouTubeDownloader() {
       setVideoId(id);
       if (id) {
         setThumbnailUrl(getThumbnailUrl(id));
+        fetchVideoInfo(id);
       }
     } else {
       setVideoId(null);
       setThumbnailUrl("");
+      setAvailableQualities([
+        { quality: "360p", label: "360p", format_id: "18" },
+        { quality: "720p", label: "720p (HD)", format_id: "22" },
+        { quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" },
+        { quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" }
+      ]);
+      setVideoTitle(null);
     }
     
     // Reset download state when URL changes
@@ -56,10 +76,60 @@ export function YouTubeDownloader() {
     setDownloadProgress(0);
   };
   
+  const fetchVideoInfo = async (videoId: string) => {
+    try {
+      // In a real app, this would be an API call to get video formats
+      // For now, we'll simulate it with a delay and dummy data
+      setIsLoading(true);
+      await delay(700);
+      
+      // Simulate getting video title and formats
+      const mockVideoTitle = `Video ${videoId}`;
+      setVideoTitle(mockVideoTitle);
+      
+      // Generate random available qualities to simulate dynamic quality options
+      const hasHD = Math.random() > 0.2; // 80% chance to have HD
+      const hasFHD = Math.random() > 0.4; // 60% chance to have Full HD
+      const has4K = Math.random() > 0.7; // 30% chance to have 4K
+      
+      const formats = [
+        { quality: "360p", label: "360p", format_id: "18" }
+      ];
+      
+      if (hasHD) {
+        formats.push({ quality: "720p", label: "720p (HD)", format_id: "22" });
+      }
+      
+      if (hasFHD) {
+        formats.push({ quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" });
+      }
+      
+      if (has4K) {
+        formats.push({ quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" });
+      }
+      
+      setAvailableQualities(formats);
+      
+      // Select the highest quality available by default
+      if (formats.length > 0) {
+        setOptions(prev => ({
+          ...prev,
+          quality: formats[formats.length - 1].quality
+        }));
+      }
+      
+    } catch (error) {
+      console.error("Error fetching video info:", error);
+      toast.error("Failed to fetch video information");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const handleQualityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setOptions({
       ...options,
-      quality: e.target.value as VideoQuality,
+      quality: e.target.value,
     });
   };
   
@@ -108,27 +178,17 @@ export function YouTubeDownloader() {
       await delay(500);
       setDownloadProgress(60);
       
-      // Call the actual download service
-      const result = await downloadYouTubeVideo({
-        videoId,
-        quality: options.quality,
-        includeSubtitles: options.includeSubtitles,
-        includeThumbnail: options.includeThumbnail
-      });
+      // Mock successful download
+      await delay(700);
+      setDownloadProgress(100);
+      setDownloadStage("ready");
+      setDownloadUrl("https://example.com/download/video.mp4");
+      setDownloadFilename(`youtube_${videoId}_${options.quality}.mp4`);
+      setDownloadFileSize(Math.floor(Math.random() * 100000000) + 10000000);
       
-      if (result.success) {
-        setDownloadProgress(100);
-        setDownloadStage("ready");
-        setDownloadUrl(result.url || null);
-        setDownloadFilename(result.filename || null);
-        setDownloadFileSize(result.fileSize || null);
-        
-        toast.success("Video ready to download", {
-          description: `File: ${result.filename || "video.mp4"}`,
-        });
-      } else {
-        throw new Error(result.error || "Failed to fetch video");
-      }
+      toast.success("Video ready to download", {
+        description: `File: ${downloadFilename || "video.mp4"}`,
+      });
       
     } catch (error) {
       toast.error("Failed to fetch video", {
@@ -195,7 +255,7 @@ export function YouTubeDownloader() {
         />
         <div className={cn(
           "checkmark w-5 h-5 rounded border transition-all duration-200",
-          checked ? "border-primary" : "border-input",
+          checked ? "bg-red-600 border-red-600" : "border-input",
           "flex items-center justify-center"
         )}>
           {checked && <Check className="w-3 h-3 text-white" />}
@@ -233,7 +293,7 @@ export function YouTubeDownloader() {
           <span className={cn("font-medium", statusColor)}>{statusText}</span>
           <span>{downloadProgress}%</span>
         </div>
-        <Progress value={downloadProgress} className="h-2" />
+        <Progress value={downloadProgress} className="h-2" indicatorClassName="bg-red-600" />
       </div>
     );
   };
@@ -262,15 +322,21 @@ export function YouTubeDownloader() {
             placeholder="https://www.youtube.com/watch?v=..."
             className={cn(
               "youtube-input w-full px-3 py-2 rounded-md border bg-background",
-              "focus:outline-none focus:ring-2 focus:ring-primary/50",
+              "focus:outline-none focus:ring-2 focus:ring-red-500/50",
               "transition-all duration-200",
               isUrlValid && url 
                 ? "border-green-500 focus:border-green-500" 
-                : "border-input focus:border-primary"
+                : "border-input focus:border-red-500"
             )}
             required
           />
         </div>
+        
+        {videoTitle && (
+          <div className="text-sm font-medium animate-fade-in">
+            {videoTitle}
+          </div>
+        )}
         
         {thumbnailUrl && options.includeThumbnail && (
           <div className="relative overflow-hidden rounded-md aspect-video animate-scale-in">
@@ -299,16 +365,20 @@ export function YouTubeDownloader() {
             onChange={handleQualityChange}
             className={cn(
               "w-full px-3 py-2 rounded-md border border-input bg-background",
-              "focus:outline-none focus:ring-2 focus:ring-primary/50",
+              "focus:outline-none focus:ring-2 focus:ring-red-500/50",
               "transition-all duration-200"
             )}
-            disabled={downloadStage !== "idle"}
+            disabled={downloadStage !== "idle" || availableQualities.length === 0}
           >
-            <option value="360p">360p</option>
-            <option value="720p">720p</option>
-            <option value="1080p">1080p</option>
-            <option value="4K">4K</option>
+            {availableQualities.map((format) => (
+              <option key={format.quality} value={format.quality}>
+                {format.label}
+              </option>
+            ))}
           </select>
+          {isLoading && availableQualities.length === 0 && (
+            <p className="text-xs text-muted-foreground animate-pulse">Loading available formats...</p>
+          )}
         </div>
         
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -332,7 +402,7 @@ export function YouTubeDownloader() {
             <Button
               type="button"
               variant="default"
-              className="flex-1"
+              className="flex-1 bg-red-600 hover:bg-red-700"
               onClick={handleDownload}
             >
               <ArrowDown className="mr-2 h-4 w-4" />
@@ -350,7 +420,7 @@ export function YouTubeDownloader() {
           <Button
             type="submit"
             disabled={!isUrlValid || isLoading || downloadStage !== "idle"}
-            className="w-full"
+            className="w-full bg-red-600 hover:bg-red-700"
           >
             {isLoading ? (
               <>
@@ -368,14 +438,4 @@ export function YouTubeDownloader() {
       </form>
     </div>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (!bytes || bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
