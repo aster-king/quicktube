@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Download, Loader, Check, ArrowDown } from "lucide-react";
 import { cn, isValidYouTubeUrl, getVideoId, getThumbnailUrl, delay } from "@/lib/utils";
@@ -37,12 +36,7 @@ export function YouTubeDownloader() {
   const [downloadFilename, setDownloadFilename] = useState<string | null>(null);
   const [downloadFileSize, setDownloadFileSize] = useState<number | null>(null);
   const [downloadStage, setDownloadStage] = useState<"idle" | "fetching" | "processing" | "ready">("idle");
-  const [availableQualities, setAvailableQualities] = useState<VideoFormat[]>([
-    { quality: "360p", label: "360p", format_id: "18" },
-    { quality: "720p", label: "720p (HD)", format_id: "22" },
-    { quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" },
-    { quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" }
-  ]);
+  const [availableQualities, setAvailableQualities] = useState<VideoFormat[]>([]);
   const [videoTitle, setVideoTitle] = useState<string | null>(null);
   
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,12 +55,7 @@ export function YouTubeDownloader() {
     } else {
       setVideoId(null);
       setThumbnailUrl("");
-      setAvailableQualities([
-        { quality: "360p", label: "360p", format_id: "18" },
-        { quality: "720p", label: "720p (HD)", format_id: "22" },
-        { quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" },
-        { quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" }
-      ]);
+      setAvailableQualities([]);
       setVideoTitle(null);
     }
     
@@ -79,7 +68,7 @@ export function YouTubeDownloader() {
   const fetchVideoInfo = async (videoId: string) => {
     try {
       // In a real app, this would be an API call to get video formats
-      // For now, we'll simulate it with a delay and dummy data
+      // For now, we'll simulate it with a delay and more realistic qualities
       setIsLoading(true);
       await delay(700);
       
@@ -87,34 +76,40 @@ export function YouTubeDownloader() {
       const mockVideoTitle = `Video ${videoId}`;
       setVideoTitle(mockVideoTitle);
       
-      // Generate random available qualities to simulate dynamic quality options
-      const hasHD = Math.random() > 0.2; // 80% chance to have HD
-      const hasFHD = Math.random() > 0.4; // 60% chance to have Full HD
-      const has4K = Math.random() > 0.7; // 30% chance to have 4K
-      
+      // Generate more comprehensive quality options to match YouTube
+      // This is a simulation - in a real app this would come from an API
       const formats = [
-        { quality: "360p", label: "360p", format_id: "18" }
+        { quality: "144p", label: "144p", format_id: "160+139" },
+        { quality: "240p", label: "240p", format_id: "133+139" },
+        { quality: "360p", label: "360p", format_id: "18" },
+        { quality: "480p", label: "480p", format_id: "135+139" },
+        { quality: "720p", label: "720p (HD)", format_id: "22" },
+        { quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" },
+        { quality: "1440p", label: "1440p (2K)", format_id: "271+140" },
+        { quality: "2160p", label: "2160p (4K)", format_id: "313+140" }
       ];
       
-      if (hasHD) {
-        formats.push({ quality: "720p", label: "720p (HD)", format_id: "22" });
+      // Simulate that some videos don't have all formats
+      // We'll randomly exclude some formats, but always keep at least 360p and 720p
+      const randomExcludeCount = Math.floor(Math.random() * 3); // Exclude 0-2 formats
+      const excludeIndices = new Set<number>();
+      
+      // Don't exclude 360p (index 2) or 720p (index 4)
+      while (excludeIndices.size < randomExcludeCount) {
+        const index = Math.floor(Math.random() * formats.length);
+        if (index !== 2 && index !== 4) {
+          excludeIndices.add(index);
+        }
       }
       
-      if (hasFHD) {
-        formats.push({ quality: "1080p", label: "1080p (Full HD)", format_id: "137+140" });
-      }
-      
-      if (has4K) {
-        formats.push({ quality: "4K", label: "4K (Ultra HD)", format_id: "313+140" });
-      }
-      
-      setAvailableQualities(formats);
+      const availableFormats = formats.filter((_, index) => !excludeIndices.has(index));
+      setAvailableQualities(availableFormats);
       
       // Select the highest quality available by default
-      if (formats.length > 0) {
+      if (availableFormats.length > 0) {
         setOptions(prev => ({
           ...prev,
-          quality: formats[formats.length - 1].quality
+          quality: availableFormats[availableFormats.length - 1].quality
         }));
       }
       
@@ -229,7 +224,6 @@ export function YouTubeDownloader() {
     setIsDownloading(false);
   };
   
-  // Checkbox component for better reusability
   const Checkbox = ({ 
     id, 
     label, 
@@ -265,7 +259,6 @@ export function YouTubeDownloader() {
     </label>
   );
 
-  // Progress indicator component
   const StageProgressIndicator = () => {
     let statusText = "";
     let statusColor = "";
@@ -302,7 +295,7 @@ export function YouTubeDownloader() {
     <div className="w-full max-w-md mx-auto">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold tracking-tight animate-fade-in">
-          QuickTube Downloader
+          YouTube Downloader
         </h1>
         <p className="mt-2 text-muted-foreground animate-fade-in delay-75">
           Download YouTube videos in your favorite format

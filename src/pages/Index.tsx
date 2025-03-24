@@ -15,7 +15,7 @@ const Index = () => {
         </div>
         
         <footer className="mt-8 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} QuickTube Downloader</p>
+          <p>© {new Date().getFullYear()} YouTube Downloader</p>
         </footer>
       </div>
     </div>
