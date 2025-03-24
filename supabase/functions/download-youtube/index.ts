@@ -10,8 +10,8 @@ const corsHeaders = {
 };
 
 // Server config - update this with your server's information
-const DOWNLOAD_SERVER_URL = Deno.env.get("DOWNLOAD_SERVER_URL") || "https://ytdlp-server.example.com";
-const SERVER_API_KEY = Deno.env.get("DOWNLOAD_SERVER_API_KEY") || "default_api_key"; 
+const DOWNLOAD_SERVER_URL = Deno.env.get("DOWNLOAD_SERVER_URL") || "https://your-ytdlp-server.example.com";
+const SERVER_API_KEY = Deno.env.get("DOWNLOAD_SERVER_API_KEY") || "your_api_key"; 
 
 interface DownloadOptions {
   videoId: string;
